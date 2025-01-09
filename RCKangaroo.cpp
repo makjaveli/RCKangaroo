@@ -353,6 +353,9 @@ bool SolvePoint(EcPoint PntToSolve, int Range, int DP, EcInt* pk_res)
 		if (db.LoadFromFile(gTamesFileName))
 		{
 			printf("tames loaded\r\n");
+			printf("Range: %d bits\n", db.Header[0]);
+			printf("DP: %d\n", db.Header[1]);
+			printf("Total DPs: %llu\n", db.GetBlockCnt());
 			if (db.Header[0] != gRange)
 			{
 				printf("loaded tames have different range, they cannot be used, clear\r\n");
@@ -483,6 +486,7 @@ bool SolvePoint(EcPoint PntToSolve, int Range, int DP, EcInt* pk_res)
 		{
 			printf("saving tames...\r\n");
 			db.Header[0] = gRange; 
+			db.Header[1] = gDP;
 			if (db.SaveToFile(gTamesFileName))
 				printf("tames saved\r\n");
 			else
