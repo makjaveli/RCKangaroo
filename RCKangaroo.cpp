@@ -448,6 +448,7 @@ bool SolvePoint(EcPoint PntToSolve, int Range, int DP, EcInt* pk_res)
 	}
 
 	u64 tm_stats = GetTickCount64();
+	u64 tm_gen = GetTickCount64();
 	while (!gSolved)
 	{
 		CheckNewPoints();
@@ -457,7 +458,15 @@ bool SolvePoint(EcPoint PntToSolve, int Range, int DP, EcInt* pk_res)
 			ShowStats(tm0, ops, dp_val);
 			tm_stats = GetTickCount64();
 		}
-
+		if (gGenMode && (GetTickCount64() - tm_gen > 120 * 1000))
+		{
+			if (!db.SaveToFile(gTamesFileName)) {
+				printf("tames saving failed\r\n");
+			} else {
+				printf("tames saved\r\n");
+			}
+			tm_gen = GetTickCount64();
+		}
 		if ((MaxTotalOps > 0.0) && (PntTotalOps > MaxTotalOps))
 		{
 			gIsOpsLimit = true;
