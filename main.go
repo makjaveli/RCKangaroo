@@ -61,9 +61,8 @@ func main() {
 		fmt.Printf("Added %d new records\n", countAdded)
 
 		// Save the merged result
-		outFile := *filename + ".merged"
-		fmt.Printf("Saving merged result to: %s\n", outFile)
-		if err := fb1.SaveToFile(outFile); err != nil {
+		fmt.Printf("Saving merged result to: %s\n", *filename)
+		if err := fb1.SaveToFile(*filename); err != nil {
 			fmt.Printf("Error saving merged file: %v\n", err)
 			os.Exit(1)
 		}
