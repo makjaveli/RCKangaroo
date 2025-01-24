@@ -7,13 +7,15 @@ import (
 	"path/filepath"
 	"strings"
 
-	"rckangaroo/fastbase"
 	"encoding/hex"
+	"rckangaroo/fastbase"
 )
 
 func main() {
 	// Parse command line arguments
-	filename := flag.String("file", "", "Path to the FastBase file to load")
+	filename := flag.String("file", "", "Path to the first FastBase file to load")
+	filename2 := flag.String("file2", "", "Path to the second FastBase file to merge")
+	tameOnly := flag.Bool("tame-only", false, "Merge only tame kangaroos")
 	prefix := flag.String("prefix", "", "Show records with this 3-byte prefix (format: 00f1f5)")
 	flag.Parse()
 
@@ -23,6 +25,53 @@ func main() {
 		os.Exit(1)
 	}
 
+	// If file2 is specified, we're in merge mode
+	if *filename2 != "" {
+		// Ensure both files exist
+		if _, err := os.Stat(*filename); os.IsNotExist(err) {
+			fmt.Printf("Error: File '%s' does not exist\n", *filename)
+			os.Exit(1)
+		}
+		if _, err := os.Stat(*filename2); os.IsNotExist(err) {
+			fmt.Printf("Error: File '%s' does not exist\n", *filename2)
+			os.Exit(1)
+		}
+
+		// Create new FastBase instances
+		fb1 := fastbase.NewFastBase()
+		fb2 := fastbase.NewFastBase()
+
+		// Load both files
+		fmt.Printf("Loading first FastBase file: %s\n", *filename)
+		if err := fb1.LoadFromFile(*filename); err != nil {
+			fmt.Printf("Error loading first file: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Loading second FastBase file: %s\n", *filename2)
+		if err := fb2.LoadFromFile(*filename2); err != nil {
+			fmt.Printf("Error loading second file: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Merge fb2 into fb1
+		fmt.Printf("Merging files%s...\n", map[bool]string{true: " (tame kangaroos only)", false: ""}[*tameOnly])
+		count, countAdded := mergeFastBases(fb1, fb2, *tameOnly)
+		fmt.Printf("%d records to merge\n", count)
+		fmt.Printf("Added %d new records\n", countAdded)
+
+		// Save the merged result
+		outFile := *filename + ".merged"
+		fmt.Printf("Saving merged result to: %s\n", outFile)
+		if err := fb1.SaveToFile(outFile); err != nil {
+			fmt.Printf("Error saving merged file: %v\n", err)
+			os.Exit(1)
+		}
+
+		os.Exit(0)
+	}
+
+	// Non-merge mode: original functionality
 	// Ensure file exists
 	if _, err := os.Stat(*filename); os.IsNotExist(err) {
 		fmt.Printf("Error: File '%s' does not exist\n", *filename)
@@ -177,11 +226,11 @@ func getPointTypeName(pointType byte) string {
 
 func parsePrefix(prefix string) ([3]byte, error) {
 	var result [3]byte
-	
+
 	// Remove any spaces and 0x prefix
 	prefix = strings.ReplaceAll(prefix, " ", "")
 	prefix = strings.TrimPrefix(prefix, "0x")
-	
+
 	if len(prefix) != 6 {
 		return result, fmt.Errorf("prefix must be exactly 6 hex characters (3 bytes), got %d characters", len(prefix))
 	}
@@ -205,11 +254,11 @@ func showRecordsByPrefix(fb *fastbase.FastBase, prefixStr string) error {
 
 	// Get the list for this prefix
 	list := fb.Lists[prefix[0]][prefix[1]][prefix[2]]
-	
+
 	fmt.Printf("\nRecords with prefix [%02x %02x %02x]:\n", prefix[0], prefix[1], prefix[2])
 	fmt.Printf("Total records: %d\n", list.Count)
 	fmt.Printf("----------------------------------------\n")
-	
+
 	if list.Count == 0 {
 		return nil
 	}
@@ -237,4 +286,34 @@ func showRecordsByPrefix(fb *fastbase.FastBase, prefixStr string) error {
 	}
 
 	return nil
+}
+
+func mergeFastBases(fb1, fb2 *fastbase.FastBase, tameOnly bool) (int, int) {
+	count := 0
+	countadded := 0
+	for i := 0; i < 256; i++ {
+		for j := 0; j < 256; j++ {
+			for k := 0; k < 256; k++ {
+				list := fb2.Lists[i][j][k]
+				if list.Count > 0 {
+					for m := uint16(0); m < list.Count; m++ {
+						ptr := list.Data[m]
+						mem := fb2.Pools[i].GetRecordPtr(ptr)
+						if tameOnly && mem[31] != 0 {
+							continue
+						}
+						added, err := fb1.AddRecord(byte(i), byte(j), byte(k), mem)
+						if err != nil {
+							fmt.Printf("Error adding record at [%02x][%02x][%02x]: %v\n", i, j, k, err)
+						}
+						if added {
+							countadded++
+						}
+						count++
+					}
+				}
+			}
+		}
+	}
+	return count, countadded
 }

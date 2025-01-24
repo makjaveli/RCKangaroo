@@ -2,7 +2,7 @@
 package fastbase
 
 import (
-	"encoding/binary"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -178,15 +178,23 @@ func (fb *FastBase) SaveToFile(filename string) error {
 	}
 
 	// Write lists
+	countBuf := make([]byte, 2)
 	for i := 0; i < 256; i++ {
 		for j := 0; j < 256; j++ {
 			for k := 0; k < 256; k++ {
 				list := fb.Lists[i][j][k]
-				if err := binary.Write(file, binary.LittleEndian, list.Count); err != nil {
+				// Write count in little-endian format
+				countBuf[0] = byte(list.Count & 0xFF)
+				countBuf[1] = byte(list.Count >> 8)
+				if _, err := file.Write(countBuf); err != nil {
 					return err
 				}
-				if list.Count > 0 {
-					if err := binary.Write(file, binary.LittleEndian, list.Data[:list.Count]); err != nil {
+
+				// Write data blocks
+				for m := uint16(0); m < list.Count; m++ {
+					ptr := list.Data[m]
+					data := fb.Pools[i].GetRecordPtr(ptr)
+					if _, err := file.Write(data); err != nil {
 						return err
 					}
 				}
@@ -208,22 +216,25 @@ func (fb *FastBase) LoadFromFile(filename string) error {
 	fb.Clear()
 
 	// Read header
-	if _, err := file.Read(fb.Header[:]); err != nil {
+	if _, err := io.ReadFull(file, fb.Header[:]); err != nil {
 		return fmt.Errorf("error reading header: %v", err)
 	}
 
 	// Read lists
+	countBuf := make([]byte, 2)
 	for i := 0; i < 256; i++ {
 		for j := 0; j < 256; j++ {
 			for k := 0; k < 256; k++ {
 				list := fb.Lists[i][j][k]
-				var count uint16
-				if err := binary.Read(file, binary.LittleEndian, &count); err != nil {
+
+				// Read count in little-endian format
+				if _, err := io.ReadFull(file, countBuf); err != nil {
 					if err == io.EOF {
 						return fmt.Errorf("unexpected EOF at position [%d][%d][%d]", i, j, k)
 					}
 					return fmt.Errorf("error reading count at [%d][%d][%d]: %v", i, j, k, err)
 				}
+				count := uint16(countBuf[0]) | uint16(countBuf[1])<<8
 
 				list.Count = count
 				if count > 0 {
@@ -242,20 +253,22 @@ func (fb *FastBase) LoadFromFile(filename string) error {
 					list.Capacity = newCap
 
 					// Read each data block
+					dataBuf := make([]byte, DBRecordLength)
 					for m := uint16(0); m < count; m++ {
 						// Allocate memory for the data block
 						ptr, mem, err := fb.Pools[i].allocRecord()
 						if err != nil {
 							return fmt.Errorf("error allocating memory at [%02x][%02x][%02x]: %v", i, j, k, err)
 						}
-						
+
 						// Store the pointer
 						list.Data[m] = ptr
 
 						// Read the data block
-						if _, err := io.ReadFull(file, mem); err != nil {
+						if _, err := io.ReadFull(file, dataBuf); err != nil {
 							return fmt.Errorf("error reading data block at [%02x][%02x][%02x]: %v", i, j, k, err)
 						}
+						copy(mem, dataBuf)
 					}
 				}
 			}
@@ -263,6 +276,71 @@ func (fb *FastBase) LoadFromFile(filename string) error {
 	}
 
 	return nil
+}
+
+// AddRecord adds a record to the FastBase at the specified prefix location if it doesn't already exist
+func (fb *FastBase) AddRecord(i, j, k byte, data []byte) (bool, error) {
+	if len(data) != DBRecordLength {
+		return false, fmt.Errorf("data length must be %d bytes", DBRecordLength)
+	}
+
+	// Get the list for the 3-byte prefix
+	list := fb.Lists[i][j][k]
+
+	// Check if record already exists
+	pos := fb.lowerBound(list, i, data)
+	if pos < int(list.Count) {
+		// Get the record at this position and compare
+		existingPtr := list.Data[pos]
+		existingData := fb.Pools[i].GetRecordPtr(existingPtr)
+
+		// Compare the entire record (excluding type field which is at position 31)
+		if bytes.Equal(data[:31], existingData[:31]) {
+			// Record already exists, no need to add it
+			return false, nil
+		}
+	}
+
+	// Allocate memory for the data block
+	ptr, mem, err := fb.Pools[i].allocRecord()
+	if err != nil {
+		return false, err
+	}
+
+	// Copy the data
+	copy(mem, data)
+
+	// If we need to grow the list
+	if list.Count >= list.Capacity {
+		grow := uint16(list.Count / 2)
+		if grow < DBMinGrowCount {
+			grow = DBMinGrowCount
+		}
+		newCap := list.Count + grow
+		if newCap > MaxListSize {
+			newCap = MaxListSize
+		}
+		if newCap <= list.Count {
+			return false, fmt.Errorf("list capacity exceeded")
+		}
+
+		// Create new slice with increased capacity
+		newData := make([]uint32, list.Count, newCap)
+		copy(newData, list.Data)
+		list.Data = newData
+		list.Capacity = newCap
+	}
+
+	// Insert the pointer at the correct position to maintain order
+	list.Data = append(list.Data, 0) // Make space for the new element
+	if pos < int(list.Count) {
+		// Shift elements to make room for the new one
+		copy(list.Data[pos+1:], list.Data[pos:list.Count])
+	}
+	list.Data[pos] = ptr
+	list.Count++
+
+	return true, nil
 }
 
 // allocRecord allocates a new record in the memory pool
