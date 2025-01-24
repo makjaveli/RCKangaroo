@@ -294,10 +294,27 @@ func (fb *FastBase) AddRecord(i, j, k byte, data []byte) (bool, error) {
 		existingPtr := list.Data[pos]
 		existingData := fb.Pools[i].GetRecordPtr(existingPtr)
 
-		// Compare the entire record (excluding type field which is at position 31)
-		if bytes.Equal(data[:31], existingData[:31]) {
-			// Record already exists, no need to add it
-			return false, nil
+		// Compare x coordinates (first 12 bytes)
+		if bytes.Equal(data[:12], existingData[:12]) {
+			// Same x coordinate, check if types are different
+			if data[31] != existingData[31] {
+				// Print both records in the same format as showRecordsByPrefix
+				fmt.Printf("\nFound records with same x coordinate but different types:\n")
+				fmt.Printf("Record 1: x=%x d=%x type=%s\n",
+					existingData[:12],
+					existingData[12:31],
+					getPointTypeName(existingData[31]))
+				fmt.Printf("Record 2: x=%x d=%x type=%s\n",
+					data[:12],
+					data[12:31],
+					getPointTypeName(data[31]))
+			}
+
+			// Compare the entire record (excluding type field which is at position 31)
+			if bytes.Equal(data[:31], existingData[:31]) {
+				// Record already exists, no need to add it
+				return false, nil
+			}
 		}
 	}
 
@@ -341,6 +358,20 @@ func (fb *FastBase) AddRecord(i, j, k byte, data []byte) (bool, error) {
 	list.Count++
 
 	return true, nil
+}
+
+// getPointTypeName returns a string representation of the point type
+func getPointTypeName(pointType byte) string {
+	switch pointType {
+	case 0:
+		return "tame"
+	case 1:
+		return "wild1"
+	case 2:
+		return "wild2"
+	default:
+		return fmt.Sprintf("unknown(%d)", pointType)
+	}
 }
 
 // allocRecord allocates a new record in the memory pool
