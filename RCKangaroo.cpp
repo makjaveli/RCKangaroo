@@ -499,6 +499,8 @@ bool SolvePoint(EcPoint PntToSolve, int Range, int DP, EcInt* pk_res)
 
 	u64 tm_stats = GetTickCount64();
 	u64 tm_gen = GetTickCount64();
+	u32 uGenSaveCount = 0;
+
 	while (!gSolved)
 	{
 		CheckNewPoints();
@@ -512,11 +514,14 @@ bool SolvePoint(EcPoint PntToSolve, int Range, int DP, EcInt* pk_res)
 			ShowStats(tm0, ops, dp_val);
 			tm_stats = GetTickCount64();
 		}
-		if (gGenMode && !IsFileExist(gTamesFileName) && (GetTickCount64() - tm_gen > 120 * 1000))
+		if (gGenMode && (GetTickCount64() - tm_gen > AUTOSAVE_INTERVAL_SECONDS * 1000))
 		{
 			db.Header[0] = gRange;
 			db.Header[1] = gDP;
-			if (!db.SaveToFile(gTamesFileName))
+
+			char gSaveFileName[1032];
+			sprintf(gSaveFileName, "%s-%i", gTamesFileName, uGenSaveCount);
+			if (!db.SaveToFile(gSaveFileName))
 			{
 				printf("tames saving failed\r\n");
 			}
@@ -524,6 +529,7 @@ bool SolvePoint(EcPoint PntToSolve, int Range, int DP, EcInt* pk_res)
 			{
 				printf("tames saved\r\n");
 			}
+			uGenSaveCount++;
 			tm_gen = GetTickCount64();
 		}
 		if ((MaxTotalOps > 0.0) && (PntTotalOps > MaxTotalOps))
