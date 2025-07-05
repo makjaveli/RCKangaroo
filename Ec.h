@@ -38,7 +38,6 @@ public:
 	void AddModP(EcInt& val);
 	void SubModP(EcInt& val);
 	void NegModP();
-	void NegModN();
 	void MulModP(EcInt& val);
 	void InvModP();
 	void SqrtModP();

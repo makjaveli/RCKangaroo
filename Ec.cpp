@@ -11,7 +11,6 @@
 
 // https://en.bitcoin.it/wiki/Secp256k1
 EcInt g_P; //FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFE FFFFFC2F
-EcInt g_N; //FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFE BAAEDCE6 AF48A03B BFD25E8C D0364141
 EcPoint g_G; //Generator point
 
 #define P_REV	0x00000001000003D1
@@ -112,7 +111,6 @@ void InitEc()
 	g_P.SetHexStr("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F"); //Fp
 	g_G.x.SetHexStr("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"); //G.x
 	g_G.y.SetHexStr("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8"); //G.y
-	g_N.SetHexStr("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"); //order of G
 #ifdef DEBUG_MODE
 	GTable = (u8*)malloc(16 * 256 * 256 * 64);
 	EcPoint pnt = g_G;
@@ -475,13 +473,6 @@ void EcInt::NegModP()
 	Add(g_P);
 }
 
-//assume value < N
-void EcInt::NegModN()
-{
-	Neg();
-	Add(g_N);
-}
-
 void EcInt::ShiftRight(int nbits)
 {
 	int offset = nbits / 64;
@@ -539,6 +530,8 @@ void EcInt::MulModP(EcInt& val)
 	c = _addcarry_u64(c, buff[1], h, data + 1);
 	c = _addcarry_u64(c, 0, buff[2], data + 2);
 	data[4] = _addcarry_u64(c, buff[3], 0, data + 3);
+	while (data[4])
+		Sub(g_P);
 }
 
 void EcInt::Mul_u64(EcInt& val, u64 multiplier)

@@ -519,7 +519,7 @@ __device__ __forceinline__ void InvModP(u32* res)
 	__align__(8) u32 modp[9];
 	__align__(8) u32 val[9];
 	__align__(8) u32 a[9];
-	__align__(8) u32 tmp[4][9];
+	__align__(8) u32 tmp[4][9+1]; //+1 because we need alignment 64bit for tmp[>0]
 
 	((u64*)modp)[0] = P_0;
 	((u64*)modp)[1] = P_123;
