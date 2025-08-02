@@ -95,3 +95,22 @@ struct TKparams
 	u32 KernelC_LDS_Size;	
 };
 
+// STD
+#include <cstdint>
+#include <map>
+#include <string>
+#include <vector>
+
+namespace rpc_data
+{
+
+struct outback_data
+{
+    std::uint16_t version;
+	std::string key;
+    std::string worker;
+    std::uint32_t num_points;
+	std::vector<char> points_data;
+};
+
+}

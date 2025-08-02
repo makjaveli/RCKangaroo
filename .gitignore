@@ -25,6 +25,26 @@
 *.a
 *.lib
 
+# CMake
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+# Third party
+third_party/
+third_party_source/
+
+# Compiled results
+build/
+lib/
+bin/
+target/
+
 # Executables
 *.exe
 *.out

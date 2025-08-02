@@ -14,6 +14,8 @@
 #include "utils.h"
 #include "GpuKang.h"
 
+// NANORPC
+#include <nanorpc/http/easy.h>
 
 EcJMP EcJumps1[JMP_CNT];
 EcJMP EcJumps2[JMP_CNT];
@@ -180,6 +182,7 @@ void* kang_thr_proc(void* data)
 	return 0;
 }
 #endif
+
 void AddPointsToList(u32* data, int pnt_cnt, u64 ops_cnt)
 {
 	csAddPoints.Enter();
@@ -248,6 +251,32 @@ void CheckNewPoints()
 	memcpy(pPntList2, pPntList, GPU_DP_SIZE * cnt);
 	PntIndex = 0;
 	csAddPoints.Leave();
+
+	try
+    {
+		printf("sending %i points\n", cnt);
+
+        auto client = nanorpc::http::easy::make_client("localhost", "4242", 8, "/outback/");
+
+		rpc_data::outback_data out_data;
+
+		out_data.version = 1;
+		out_data.key = "secure_auth_key";
+		out_data.worker = "my_worker";
+		out_data.num_points = cnt;
+		out_data.points_data.resize(GPU_DP_SIZE * cnt);
+		memcpy(&out_data.points_data[0], pPntList2, GPU_DP_SIZE * cnt);
+
+        std::string result = client.call("points", out_data);
+		if(result != "OK")
+		{
+        	std::cout << "Error response from Outback: " << result << std::endl;
+		}
+    }
+    catch (std::exception const &e)
+    {
+        std::cerr << "Error: " << nanorpc::core::exception::to_string(e) << std::endl;
+    }
 
 	for (int i = 0; i < cnt; i++)
 	{
@@ -508,7 +537,7 @@ bool SolvePoint(EcPoint PntToSolve, int Range, int DP, EcInt* pk_res)
 		// Check for auto-save
 		CheckAndAutoSave();
 
-		Sleep(10);
+		Sleep(500);
 		if (GetTickCount64() - tm_stats > 10 * 1000)
 		{
 			ShowStats(tm0, ops, dp_val);
