@@ -24,7 +24,7 @@ typedef char i8;
 //must be divisible by MD_LEN
 #define STEP_CNT			1000
 
-#define JMP_CNT				512
+#define JMP_CNT				1024	// 512
 
 //use different options for cards older than RTX 40xx
 #ifdef __CUDA_ARCH__
