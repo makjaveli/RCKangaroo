@@ -3,9 +3,9 @@ NVCC := /usr/local/cuda/bin/nvcc
 CUDA_PATH ?= /usr/local/cuda
 NANORPC_PATH := ./nanorpc/target/nanorpc
 
-CCFLAGS := -O3 -I$(CUDA_PATH)/include -I$(NANORPC_PATH)/include
+CCFLAGS := -O3 -I$(CUDA_PATH)/include -I$(NANORPC_PATH)/include -I$(NANORPC_PATH)/../../third_party/boost/include
 NVCCFLAGS := -O3 -gencode=arch=compute_89,code=compute_89 -gencode=arch=compute_86,code=compute_86 -gencode=arch=compute_80,code=compute_80
-LDFLAGS := -L$(CUDA_PATH)/lib64 -lcudart -pthread -L$(NANORPC_PATH)/lib -lnanorpc -lboost_system -lboost_thread -lpthread -lcrypto -lssl
+LDFLAGS := -L$(CUDA_PATH)/lib64 -lcudart -pthread -L$(NANORPC_PATH)/lib -L$(NANORPC_PATH)/../../third_party/boost/lib -lnanorpc -lboost_system -lpthread -lcrypto -lssl
 
 CPU_SRC := RCKangaroo.cpp GpuKang.cpp Ec.cpp utils.cpp
 GPU_SRC := RCGpuCore.cu
